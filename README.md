@@ -1,4 +1,4 @@
-# Hi, I'm Verlene 👋
+# Hi, I'm Verlene
 
 🎓 M1 Finance @ ESG Paris | From Côte d'Ivoire  
 📈 Self-teaching Quant Finance & Algo Trading  
