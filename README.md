@@ -24,6 +24,7 @@ Currently documenting my learning week by week — from Python basics to ML on f
 | Project | Description | Status |
 |---------|-------------|--------|
 | [Quant-2027](https://github.com/Vrln27/Quant-2027) | My quant learning journey — week by week | 🔄 In progress |
+| [Quant Tracker](https://vrln27.github.io/vrln27/) | Responsive web app tracking my 34-week quant finance training (works on desktop & mobile) | 🔄 In progress |
 
 ---
 
