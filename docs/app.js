@@ -311,6 +311,8 @@ function buildDefaultWeeks() {
         titre: e[0], desc: e[1], file: e[2],
         done: num <= 13 || (num === 14 && j === 0),
       })),
+      notes: "",
+      links: [],
     };
   });
 }
@@ -334,6 +336,8 @@ function loadState() {
       return Object.assign({}, w, {
         status: [S.done, S.doing, S.todo].includes(sw.status) ? sw.status : w.status,
         exos: w.exos.map((e, i) => (sw.exos && sw.exos[i] ? Object.assign({}, e, { done: !!sw.exos[i].done }) : e)),
+        notes: typeof sw.notes === "string" ? sw.notes : w.notes,
+        links: Array.isArray(sw.links) ? sw.links.filter((l) => l && typeof l.url === "string").map((l) => ({ titre: String(l.titre || l.url), url: String(l.url) })) : w.links,
       });
     });
     return {
@@ -354,7 +358,10 @@ let state = loadState();
 function persist() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      weeks: state.weeks.map((w) => ({ num: w.num, status: w.status, exos: w.exos.map((e) => ({ done: e.done })) })),
+      weeks: state.weeks.map((w) => ({
+        num: w.num, status: w.status, exos: w.exos.map((e) => ({ done: e.done })),
+        notes: w.notes, links: w.links,
+      })),
       selected: state.selected, filter: state.filter, tab: state.tab, view: state.view,
     }));
   } catch (err) {
@@ -370,6 +377,33 @@ function toggleExo(num, idx) {
   state.weeks = state.weeks.map((w) => {
     if (w.num !== num) return w;
     return Object.assign({}, w, { exos: w.exos.map((e, i) => (i === idx ? Object.assign({}, e, { done: !e.done }) : e)) });
+  });
+}
+
+function setNotes(num, notes) {
+  state.weeks = state.weeks.map((w) => (w.num === num ? Object.assign({}, w, { notes }) : w));
+}
+
+function normalizeUrl(raw) {
+  const url = raw.trim();
+  if (!url) return "";
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : `https://${url}`;
+}
+
+function addLink(num, titre, url) {
+  const normalized = normalizeUrl(url);
+  if (!normalized) return;
+  state.weeks = state.weeks.map((w) => {
+    if (w.num !== num) return w;
+    const label = titre.trim() || normalized.replace(/^https?:\/\//, "");
+    return Object.assign({}, w, { links: w.links.concat([{ titre: label, url: normalized }]) });
+  });
+}
+
+function removeLink(num, idx) {
+  state.weeks = state.weeks.map((w) => {
+    if (w.num !== num) return w;
+    return Object.assign({}, w, { links: w.links.filter((_, i) => i !== idx) });
   });
 }
 
@@ -558,6 +592,7 @@ function renderSeance() {
     { label: "Cours", count: String(sel.points.length) },
     { label: "Formules", count: String(sel.formules.length) },
     { label: "Exercices", count: `${sel.exos.filter((e) => e.done).length}/${sel.exos.length}` },
+    { label: "Notes", count: String(sel.links.length) },
   ];
   const tabsHtml = tabsDef.map((t) => `<button class="tab-btn ${tab === t.label ? "active" : ""}" data-action="set-tab" data-tab="${t.label}"><span>${t.label}</span><span class="count">${t.count}</span></button>`).join("");
 
@@ -575,6 +610,24 @@ function renderSeance() {
         </span>
       </button>`).join("");
     content = `<div class="exos-head"><span class="label">Exercices Python</span><span class="count">${sel.exos.filter((e) => e.done).length} faits</span></div><div class="exos-grid">${exoHtml}</div>`;
+  } else if (tab === "Notes") {
+    const linksHtml = sel.links.length
+      ? sel.links.map((l, i) => `<div class="link-row">
+          <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.titre)}</a>
+          <button class="link-remove" data-action="remove-link" data-idx="${i}" aria-label="Supprimer ce lien">×</button>
+        </div>`).join("")
+      : `<div class="links-empty">Aucun lien pour l'instant — ajoute un lien vers ton vrai cours, une vidéo, un PDF…</div>`;
+    content = `
+      <div class="cell-label" style="margin-bottom:var(--space-4)">Mes notes</div>
+      <textarea id="notes-textarea" class="notes-textarea" placeholder="Écris ici tes notes personnelles pour cette séance…">${escapeHtml(sel.notes)}</textarea>
+
+      <div class="cell-label" style="margin:var(--space-8) 0 var(--space-4)">Mes ressources</div>
+      <div class="links-list">${linksHtml}</div>
+      <div class="link-add-row">
+        <input id="link-title-input" class="link-input" type="text" placeholder="Titre (ex. Cours Coursera S14)">
+        <input id="link-url-input" class="link-input" type="text" placeholder="Lien (ex. https://…)">
+        <button class="btn-secondary" data-action="add-link">Ajouter</button>
+      </div>`;
   } else {
     const pointsHtml = sel.points.map((txt, i) => `<div class="point-item"><span class="p-n">${String(i + 1).padStart(2, "0")}</span><span class="p-txt">${escapeHtml(txt)}</span></div>`).join("");
     content = `<div class="cell-label" style="margin-bottom:var(--space-6)">Points clés à maîtriser</div><div class="points-grid">${pointsHtml}</div>`;
@@ -630,6 +683,15 @@ function handleAction(el) {
     case "next-seance": state.selected = Math.min(34, state.selected + 1); break;
     case "set-status": setStatus(state.selected, el.dataset.status); break;
     case "toggle-exo": toggleExo(state.selected, Number(el.dataset.idx)); break;
+    case "remove-link": removeLink(state.selected, Number(el.dataset.idx)); break;
+    case "add-link": {
+      const titleInput = document.getElementById("link-title-input");
+      const urlInput = document.getElementById("link-url-input");
+      const url = urlInput ? urlInput.value : "";
+      if (!url.trim()) return;
+      addLink(state.selected, titleInput ? titleInput.value : "", url);
+      break;
+    }
     default: return;
   }
   persist();
@@ -646,7 +708,20 @@ document.getElementById("app").addEventListener("click", (e) => {
   handleAction(el);
 });
 
+document.getElementById("app").addEventListener("input", (e) => {
+  if (e.target.id !== "notes-textarea") return;
+  setNotes(state.selected, e.target.value);
+  persist();
+});
+
 document.getElementById("app").addEventListener("keydown", (e) => {
+  if (e.target.id === "link-title-input" || e.target.id === "link-url-input") {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAction({ dataset: { action: "add-link" } });
+    }
+    return;
+  }
   if (e.key !== "Enter" && e.key !== " ") return;
   const el = e.target.closest('[data-action][role="button"]');
   if (!el) return;
