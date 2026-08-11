@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Quant Tracker">
+  <rect width="512" height="512" fill="#201e1d"/>
+  <rect x="0" y="465" width="512" height="47" fill="#ec3013"/>
+  <text x="256" y="330" font-family="Archivo, system-ui, sans-serif" font-weight="800" font-size="300" fill="#ffffff" text-anchor="middle">Q</text>
+</svg>

@@ -1,0 +1,16 @@
+{
+  "name": "Quant Tracker — suivi de formation quantitative",
+  "short_name": "Quant / 34",
+  "description": "Suivi de progression de la formation en finance quantitative : 34 séances, 4 phases, cours, formules et exercices Python.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f3f2f2",
+  "theme_color": "#201e1d",
+  "lang": "fr",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
