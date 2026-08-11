@@ -313,6 +313,7 @@ function buildDefaultWeeks() {
       })),
       notes: "",
       links: [],
+      customFormules: [],
     };
   });
 }
@@ -338,6 +339,7 @@ function loadState() {
         exos: w.exos.map((e, i) => (sw.exos && sw.exos[i] ? Object.assign({}, e, { done: !!sw.exos[i].done }) : e)),
         notes: typeof sw.notes === "string" ? sw.notes : w.notes,
         links: Array.isArray(sw.links) ? sw.links.filter((l) => l && typeof l.url === "string").map((l) => ({ titre: String(l.titre || l.url), url: String(l.url) })) : w.links,
+        customFormules: Array.isArray(sw.customFormules) ? sw.customFormules.filter((f) => typeof f === "string" && f.trim()) : w.customFormules,
       });
     });
     return {
@@ -360,7 +362,7 @@ function persist() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       weeks: state.weeks.map((w) => ({
         num: w.num, status: w.status, exos: w.exos.map((e) => ({ done: e.done })),
-        notes: w.notes, links: w.links,
+        notes: w.notes, links: w.links, customFormules: w.customFormules,
       })),
       selected: state.selected, filter: state.filter, tab: state.tab, view: state.view,
     }));
@@ -404,6 +406,19 @@ function removeLink(num, idx) {
   state.weeks = state.weeks.map((w) => {
     if (w.num !== num) return w;
     return Object.assign({}, w, { links: w.links.filter((_, i) => i !== idx) });
+  });
+}
+
+function addFormule(num, text) {
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  state.weeks = state.weeks.map((w) => (w.num === num ? Object.assign({}, w, { customFormules: w.customFormules.concat([trimmed]) }) : w));
+}
+
+function removeFormule(num, idx) {
+  state.weeks = state.weeks.map((w) => {
+    if (w.num !== num) return w;
+    return Object.assign({}, w, { customFormules: w.customFormules.filter((_, i) => i !== idx) });
   });
 }
 
@@ -590,16 +605,27 @@ function renderSeance() {
 
   const tabsDef = [
     { label: "Cours", count: String(sel.points.length) },
-    { label: "Formules", count: String(sel.formules.length) },
+    { label: "Formules", count: String(sel.formules.length + sel.customFormules.length) },
     { label: "Exercices", count: `${sel.exos.filter((e) => e.done).length}/${sel.exos.length}` },
-    { label: "Notes", count: String(sel.links.length) },
   ];
   const tabsHtml = tabsDef.map((t) => `<button class="tab-btn ${tab === t.label ? "active" : ""}" data-action="set-tab" data-tab="${t.label}"><span>${t.label}</span><span class="count">${t.count}</span></button>`).join("");
 
   let content;
   if (tab === "Formules") {
     const formHtml = sel.formules.map((txt) => `<div class="formule-line">${escapeHtml(txt)}</div>`).join("");
-    content = `<div class="cell-label" style="margin-bottom:var(--space-6)">Repères et formules</div>${formHtml}`;
+    const customHtml = sel.customFormules.map((txt, i) => `<div class="formule-row">
+        <div class="formule-line">${escapeHtml(txt)}</div>
+        <button class="link-remove" data-action="remove-formule" data-idx="${i}" aria-label="Supprimer cette formule">×</button>
+      </div>`).join("");
+    content = `
+      <div class="cell-label" style="margin-bottom:var(--space-6)">Repères et formules</div>
+      ${formHtml}
+      ${customHtml}
+      <div class="cell-label" style="margin:var(--space-6) 0 var(--space-4)">Ajouter ma formule</div>
+      <div class="link-add-row">
+        <input id="formule-input" class="link-input" type="text" placeholder="Ex. Var(X+Y) = Var(X) + Var(Y) + 2Cov(X,Y)" style="flex:1 1 100%">
+        <button class="btn-secondary" data-action="add-formule">Ajouter</button>
+      </div>`;
   } else if (tab === "Exercices") {
     const exoHtml = sel.exos.map((e, i) => `<button class="exo-card ${e.done ? "done" : ""}" data-action="toggle-exo" data-idx="${i}">
         <span class="box"></span>
@@ -610,7 +636,8 @@ function renderSeance() {
         </span>
       </button>`).join("");
     content = `<div class="exos-head"><span class="label">Exercices Python</span><span class="count">${sel.exos.filter((e) => e.done).length} faits</span></div><div class="exos-grid">${exoHtml}</div>`;
-  } else if (tab === "Notes") {
+  } else {
+    const pointsHtml = sel.points.map((txt, i) => `<div class="point-item"><span class="p-n">${i + 1}</span><span class="p-txt">${escapeHtml(txt)}</span></div>`).join("");
     const linksHtml = sel.links.length
       ? sel.links.map((l, i) => `<div class="link-row">
           <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.titre)}</a>
@@ -618,8 +645,11 @@ function renderSeance() {
         </div>`).join("")
       : `<div class="links-empty">Aucun lien pour l'instant — ajoute un lien vers ton vrai cours, une vidéo, un PDF…</div>`;
     content = `
-      <div class="cell-label" style="margin-bottom:var(--space-4)">Mes notes</div>
-      <textarea id="notes-textarea" class="notes-textarea" placeholder="Écris ici tes notes personnelles pour cette séance…">${escapeHtml(sel.notes)}</textarea>
+      <div class="cell-label" style="margin-bottom:var(--space-3)">À maîtriser — aide-mémoire</div>
+      <div class="points-list">${pointsHtml}</div>
+
+      <div class="cell-label" style="margin-bottom:var(--space-4)">Mes notes de cours</div>
+      <textarea id="notes-textarea" class="notes-textarea" placeholder="Écris ici le vrai contenu du cours, dans tes mots : ce que tu as appris, tes exemples, tes explications…">${escapeHtml(sel.notes)}</textarea>
 
       <div class="cell-label" style="margin:var(--space-8) 0 var(--space-4)">Mes ressources</div>
       <div class="links-list">${linksHtml}</div>
@@ -628,9 +658,6 @@ function renderSeance() {
         <input id="link-url-input" class="link-input" type="text" placeholder="Lien (ex. https://…)">
         <button class="btn-secondary" data-action="add-link">Ajouter</button>
       </div>`;
-  } else {
-    const pointsHtml = sel.points.map((txt, i) => `<div class="point-item"><span class="p-n">${String(i + 1).padStart(2, "0")}</span><span class="p-txt">${escapeHtml(txt)}</span></div>`).join("");
-    content = `<div class="cell-label" style="margin-bottom:var(--space-6)">Points clés à maîtriser</div><div class="points-grid">${pointsHtml}</div>`;
   }
 
   return `<div>
@@ -655,7 +682,7 @@ function renderSeance() {
       </div>
     </nav>
 
-    <div class="tab-content" style="--cours-cols:2">
+    <div class="tab-content">
       ${content}
     </div>
   </div>`;
@@ -692,6 +719,14 @@ function handleAction(el) {
       addLink(state.selected, titleInput ? titleInput.value : "", url);
       break;
     }
+    case "remove-formule": removeFormule(state.selected, Number(el.dataset.idx)); break;
+    case "add-formule": {
+      const formuleInput = document.getElementById("formule-input");
+      const text = formuleInput ? formuleInput.value : "";
+      if (!text.trim()) return;
+      addFormule(state.selected, text);
+      break;
+    }
     default: return;
   }
   persist();
@@ -719,6 +754,13 @@ document.getElementById("app").addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       handleAction({ dataset: { action: "add-link" } });
+    }
+    return;
+  }
+  if (e.target.id === "formule-input") {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAction({ dataset: { action: "add-formule" } });
     }
     return;
   }
