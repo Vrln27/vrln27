@@ -1,6 +1,6 @@
 # Hi, I'm Verlene
 
-🎓 M1 Finance @ ESG Paris | From Côte d'Ivoire  
+🎓 M2 Big Data & Data Science in finance @ ESG Paris | From Côte d'Ivoire  
 📈 Self-teaching Quant Finance & Algo Trading  
 🌍 Open to international opportunities  
 
